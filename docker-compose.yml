@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+
+  storage:
+    container_name: ${APP_NAME}dbms
+    # image: postgis/postgis:14-master
+    build:
+      context: ./storage/
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DBPORT: ${DBPORT}
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+      DBNAME: ${DBNAME}
+      DBUSERNAME: ${DBUSERNAME}
+      DBUSERPASSWORD: ${DBUSERPASSWORD}
+    ports:
+      - "5432:${DBPORT}"
+    # env_file: ./env_private/dbms.env
+    # volumes:
+    #   - ./db/data:/var/lib/postgresql/data
+    networks:
+      default:
+        aliases:
+          - dbms.${APP_NAME}
+
+  webapi:
+    container_name: ${APP_NAME}webapi
+    ports:
+      - "8000:${APIPORT}"
+    build:
+      context: ./webapi/
+      dockerfile: Dockerfile
+      args:
+        - user=${APIUSER}
+    restart: unless-stopped
+    environment:
+      - PYDAL_URI=postgres://${DBUSERNAME}:${DBUSERPASSWORD}@dbms.${APP_NAME}:5432/${DBNAME}
+    volumes:
+      - ./apps:/home/${APIUSER}/apps
+    stdin_open: true
+    tty: true
+    depends_on:
+      - storage
+    networks:
+      default:
+        aliases:
+          - api.${APP_NAME}
