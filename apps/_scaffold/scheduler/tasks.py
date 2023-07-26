@@ -9,26 +9,33 @@ To use celery tasks:
 5) Start "celery -A apps.{appname}.tasks worker --loglevel=info" for each worker
 
 """
-from .common import settings, scheduler, db, Field
+from . import settings as scheduler_settings
+from ..common import settings, scheduler, db
+from .scheduler import run_next
 
 # example of task that needs db access
-@scheduler.task
+@scheduler.task(
+    retry_backoff=5,
+    max_retries=10,
+    retry_jitter=False,
+)
 def my_task():
     try:
         # this task will be executed in its own thread, connect to db
         db._adapter.reconnect()
         # do something here
+        run_next()
         db.commit()
     except:
         # rollback on failure
         db.rollback()
 
 
-# run my_task every 10 seconds
+# run my_task periodically
 scheduler.conf.beat_schedule = {
     "my_first_task": {
         "task": "apps.%s.tasks.my_task" % settings.APP_NAME,
-        "schedule": 10.0,
+        "schedule": scheduler_settings.HEARTBEAT,
         "args": (),
     },
 }
